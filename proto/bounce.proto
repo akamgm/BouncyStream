@@ -3,14 +3,14 @@ syntax = "proto3";
 package BouncyStream;
 
 service Bounce {
-	rpc AddBall (BallRequest) returns (stream BounceReply) {}
+	rpc AddBall (BallRequest) returns (stream SceneState) {}
 }
 
 message BallRequest {
 	string id = 1;
 }
 
-message BounceReply {
+message SceneState {
 	int32 xpos = 1;
 	int32 ypos = 2;
 }
