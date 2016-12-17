@@ -13,8 +13,8 @@ import (
 
 const (
 	port        = ":50051"
-	TICK_MS     = 100
-	BALL_RADIUS = 5
+	TICK_MS     = 10
+	BALL_RADIUS = 10
 	BOARD_SIZE  = 500
 )
 

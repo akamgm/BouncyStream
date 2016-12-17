@@ -1,7 +1,7 @@
 GOPATH := ${PWD}
 export GOPATH
 
-all: install-grpc pbgo
+all: install-grpc pbgo gorilla
 	go build ...
 
 pbgo: 
@@ -10,6 +10,9 @@ pbgo:
 install-grpc:
 	go get google.golang.org/grpc
 	go get -u github.com/golang/protobuf/{proto,protoc-gen-go}
+
+gorilla:
+	go get github.com/gorilla/websocket
 
 clean:
 	go clean ...

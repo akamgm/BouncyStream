@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Bouncy Stream</title>
+<script type="text/javascript">
+	window.onload = function () {
+
+	context= world.getContext('2d');
+	context.rect(0,0,{{.BoardSize}},{{.BoardSize}});
+	context.stroke();
+
+    var conn;
+    if (window["WebSocket"]) {
+        conn = new WebSocket("ws://{{.Host}}/ws");
+        conn.onclose = function (evt) {
+            console.log("Connection closed");
+        };
+        conn.onmessage = function (evt) {
+            var messages = evt.data.split('\n');
+            for (var i = 0; i < messages.length; i++) {
+            	var pos = messages[i].split(',');
+			
+				context= world.getContext('2d');
+			    context.clearRect(1,1, {{.BoardSize}}-2,{{.BoardSize}}-2);
+				//context.rect(0,0,{{.BoardSize}},{{.BoardSize}});
+				//context.stroke();
+			    context.beginPath();
+			    context.fillStyle="#0000ff";
+			    // Draws a circle of radius 20 at the coordinates 100,100 on the canvas
+			    context.arc(pos[0],pos[1],{{.BallRadius}},0,Math.PI*2,true); 
+			    context.closePath();
+			    context.fill();
+            }
+        };
+    } else {       
+        console.log("This browser does not support WebSockets.");
+    }
+};
+</script>
+</head>
+<body>
+  <canvas id="world" width="{{.BoardSize}}" height="{{.BoardSize}}">
+  </canvas>
+</body>
+</html>
