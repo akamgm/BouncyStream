@@ -13,4 +13,5 @@ message BallRequest {
 message SceneState {
 	int32 xpos = 1;
 	int32 ypos = 2;
+	string id = 3;
 }
