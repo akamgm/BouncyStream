@@ -7,6 +7,7 @@ import (
 	"net"
 	"time"
 
+	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 )
 
@@ -74,6 +75,11 @@ func (s *server) AddBall(in *bs.BallRequest, stream bs.Bounce_AddBallServer) err
 		b.UpdatePosition()
 	}
 	return nil
+}
+
+func (s *server) RegisterClient(ctx context.Context, req *bs.RegisterRequest) (*bs.RegisterResponse, error) {
+	log.Printf("Hello %s\n", req.ClientId)
+	return &bs.RegisterResponse{BoardSize: BOARD_SIZE, BallRadius: BALL_RADIUS}, nil
 }
 
 func main() {

@@ -3,7 +3,17 @@ syntax = "proto3";
 package BouncyStream;
 
 service Bounce {
+	rpc RegisterClient (RegisterRequest) returns (RegisterResponse) {}
 	rpc AddBall (BallRequest) returns (stream SceneState) {}
+}
+
+message RegisterRequest {
+	string client_id = 1;
+}
+
+message RegisterResponse {
+	int32 board_size = 1;
+	int32 ball_radius = 2;
 }
 
 message BallRequest {
