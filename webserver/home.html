@@ -11,25 +11,30 @@
 
     var conn;
     if (window["WebSocket"]) {
-        conn = new WebSocket("ws://{{.Host}}/ws");
+        conn = new WebSocket("ws://{{.Host}}/ws2");
         conn.onclose = function (evt) {
             console.log("Connection closed");
         };
+        document.onkeypress = function (e) {
+		    e = e || window.event;
+		    // use e.keyCode
+		    conn.send("urp\n")
+		};
+
         conn.onmessage = function (evt) {
+			context= world.getContext('2d');
+		    context.clearRect(1,1, {{.BoardSize}}-2,{{.BoardSize}}-2);
+
             var messages = evt.data.split('\n');
             for (var i = 0; i < messages.length; i++) {
-            	var pos = messages[i].split(',');
-			
-				context= world.getContext('2d');
-			    context.clearRect(1,1, {{.BoardSize}}-2,{{.BoardSize}}-2);
-				//context.rect(0,0,{{.BoardSize}},{{.BoardSize}});
-				//context.stroke();
-			    context.beginPath();
-			    context.fillStyle="#0000ff";
-			    // Draws a circle of radius 20 at the coordinates 100,100 on the canvas
-			    context.arc(pos[0],pos[1],{{.BallRadius}},0,Math.PI*2,true); 
-			    context.closePath();
-			    context.fill();
+            	b = JSON.parse(messages[i]);
+            	for (var n = 0; i < b.balls.length; n++) {
+				    context.beginPath();
+				    context.fillStyle="#0000FF";
+				    context.arc(b.balls[n].xpos,b.balls[n].ypos,{{.BallRadius}},0,Math.PI*2,true); 
+				    context.closePath();
+				    context.fill();            		
+            	}
             }
         };
     } else {       

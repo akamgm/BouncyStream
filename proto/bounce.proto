@@ -4,7 +4,8 @@ package BouncyStream;
 
 service Bounce {
 	rpc RegisterClient (RegisterRequest) returns (RegisterResponse) {}
-	rpc AddBall (BallRequest) returns (stream SceneState) {}
+	rpc AddBall (BallRequest) returns (stream BallState) {}
+	rpc AddBallStream (stream BallRequest) returns (stream WorldState) {}
 }
 
 message RegisterRequest {
@@ -20,8 +21,12 @@ message BallRequest {
 	string id = 1;
 }
 
-message SceneState {
+message BallState {
 	int32 xpos = 1;
 	int32 ypos = 2;
 	string id = 3;
+}
+
+message WorldState {
+	repeated BallState balls = 1;
 }

@@ -3,6 +3,7 @@ package main
 import (
 	bs "../proto"
 
+	"encoding/json"
 	"fmt"
 	"io"
 	"log"
@@ -64,6 +65,64 @@ func serveWs(w http.ResponseWriter, r *http.Request) {
 
 }
 
+func serveWs2(w http.ResponseWriter, r *http.Request) {
+	conn, err := upgrader.Upgrade(w, r, nil)
+
+	if err != nil {
+		log.Println(err)
+		return
+	}
+
+	simConn, err := grpc.Dial(simPort, grpc.WithInsecure())
+	if err != nil {
+		grpclog.Fatalf("fail to dial: %v", err)
+	}
+
+	defer simConn.Close()
+	client := bs.NewBounceClient(simConn)
+	stream, err := client.AddBallStream(context.Background())
+	if err != nil {
+		grpclog.Fatalf("%v.AddBallStream(_) = _, %v", client, err)
+	}
+
+	// read from Simulator, write to client
+	go func() {
+		for {
+			state, err := stream.Recv()
+			if err == io.EOF {
+				break
+			}
+			if err != nil {
+				grpclog.Fatalf("%v.AddBallStream(_) = _, %v", client, err)
+			}
+
+			w, err := conn.NextWriter(websocket.TextMessage)
+			if err != nil {
+				return
+			}
+
+			j, _ := json.Marshal(state)
+			fmt.Fprintf(w, "%s\n", string(j))
+		}
+	}()
+
+	stream.Send(&bs.BallRequest{Id: "ball 1"})
+
+	// read from client, write to sim
+	for {
+		_, message, err := conn.ReadMessage()
+		if err != nil {
+			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway) {
+				log.Printf("error: %v", err)
+			}
+			break
+		}
+		log.Printf("message received: %s\n", message)
+		stream.Send(&bs.BallRequest{Id: "ball 1"})
+	}
+
+}
+
 func registerWithSim(id string) (boardSize, ballRadius int32) {
 	conn, err := grpc.Dial(simPort, grpc.WithInsecure())
 	if err != nil {
@@ -111,6 +170,7 @@ func serveHome(w http.ResponseWriter, r *http.Request) {
 func main() {
 	http.HandleFunc("/", serveHome)
 	http.HandleFunc("/ws", serveWs)
+	http.HandleFunc("/ws2", serveWs2)
 
 	err := http.ListenAndServe(port, nil)
 	if err != nil {

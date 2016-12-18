@@ -3,7 +3,7 @@ package main
 import (
 	bs "../proto"
 	"log"
-	"math/rand"
+
 	"net"
 	"time"
 
@@ -18,53 +18,48 @@ const (
 	BOARD_SIZE  = 500
 )
 
-type Ball struct {
-	Id     string
-	Xpos   int
-	Ypos   int
-	Xspeed int
-	Yspeed int
+type SimServer struct {
+	population []*Ball
+	snapshots  chan *bs.WorldState
 }
 
-func NewBall(id string) *Ball {
-	// just initialize with some random values
-	var b Ball
-	b.Id = id
-	b.Xpos = rand.Intn(BOARD_SIZE - 2*BALL_RADIUS)
-	b.Ypos = rand.Intn(BOARD_SIZE - 2*BALL_RADIUS)
-	b.Xspeed = rand.Intn(2*BALL_RADIUS) - BALL_RADIUS
-	b.Yspeed = rand.Intn(2*BALL_RADIUS) - BALL_RADIUS
-	return &b
+func NewSimServer() *SimServer {
+	var ss SimServer
+	ss.snapshots = make(chan *bs.WorldState, 64)
+	return &ss
 }
 
-func (b *Ball) UpdatePosition() {
-	// only worry about collisions with the walls, not other balls
-	b.Xpos += b.Xspeed
-	if b.Xpos+BALL_RADIUS > BOARD_SIZE {
-		b.Xpos = BOARD_SIZE - BALL_RADIUS
-		b.Xspeed *= -1
-	} else if b.Xpos < BALL_RADIUS {
-		b.Xpos = BALL_RADIUS
-		b.Xspeed *= -1
-	}
-
-	b.Ypos += b.Yspeed
-	if b.Ypos+BALL_RADIUS > BOARD_SIZE {
-		b.Ypos = BOARD_SIZE - BALL_RADIUS
-		b.Yspeed *= -1
-	} else if b.Ypos < BALL_RADIUS {
-		b.Ypos = BALL_RADIUS
-		b.Yspeed *= -1
+func (s *SimServer) RunWorld() {
+	for {
+		s.Tick()
+		time.Sleep(TICK_MS * time.Millisecond)
 	}
 }
 
-func (b *Ball) ToProto() *bs.SceneState {
-	return &bs.SceneState{Xpos: int32(b.Xpos), Ypos: int32(b.Ypos), Id: b.Id}
+func (s *SimServer) Tick() {
+	// since population is empty if there are no clients, use
+	// this as a proxy for whether to emit state
+	if len(s.population) == 0 {
+		return
+	}
+
+	s.UpdatePositions()
+
+	// emit scene here
+	var world bs.WorldState
+	for _, b := range s.population {
+		world.Balls = append(world.Balls, b.ToProto())
+	}
+	s.snapshots <- &world
 }
 
-type server struct{}
+func (s *SimServer) UpdatePositions() {
+	for _, b := range s.population {
+		b.UpdatePosition()
+	}
+}
 
-func (s *server) AddBall(in *bs.BallRequest, stream bs.Bounce_AddBallServer) error {
+func (s *SimServer) AddBall(in *bs.BallRequest, stream bs.Bounce_AddBallServer) error {
 	b := NewBall(in.Id)
 	for {
 		if err := stream.Send(b.ToProto()); err != nil {
@@ -77,7 +72,34 @@ func (s *server) AddBall(in *bs.BallRequest, stream bs.Bounce_AddBallServer) err
 	return nil
 }
 
-func (s *server) RegisterClient(ctx context.Context, req *bs.RegisterRequest) (*bs.RegisterResponse, error) {
+func (s *SimServer) AddBallStream(stream bs.Bounce_AddBallStreamServer) error {
+	reqs := make(chan *bs.BallRequest, 32)
+	go func() {
+		for {
+			in, err := stream.Recv()
+			if err != nil {
+				log.Println(err)
+				return
+			}
+			reqs <- in
+		}
+	}()
+
+	for {
+		select {
+		case r := <-reqs:
+			log.Printf("r: %v\n", r)
+			s.population = append(s.population, NewBall(r.Id))
+		case e := <-s.snapshots:
+			if err := stream.Send(e); err != nil {
+				log.Println(err)
+				return err
+			}
+		}
+	}
+}
+
+func (s *SimServer) RegisterClient(ctx context.Context, req *bs.RegisterRequest) (*bs.RegisterResponse, error) {
 	log.Printf("Hello %s\n", req.ClientId)
 	return &bs.RegisterResponse{BoardSize: BOARD_SIZE, BallRadius: BALL_RADIUS}, nil
 }
@@ -88,8 +110,11 @@ func main() {
 		log.Fatalf("failed to listen: %v", err)
 	}
 
+	ss := NewSimServer()
+	go ss.RunWorld()
+
 	s := grpc.NewServer()
-	bs.RegisterBounceServer(s, &server{})
+	bs.RegisterBounceServer(s, ss)
 	if err := s.Serve(lis); err != nil {
 		log.Fatalf("failed to serve: %v", err)
 	}
